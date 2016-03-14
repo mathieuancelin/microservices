@@ -1,0 +1,92 @@
+apply plugin: 'java'
+
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.github.jengelman.gradle.plugins:shadow:1.2.2'
+    }
+}
+
+allprojects {
+    apply plugin: 'java'
+    group = 'org.reactivecouchbase'
+    version = '1.0'
+}
+
+subprojects {
+    apply plugin: 'application'
+    sourceCompatibility = 1.8
+    mainClassName = 'org.reactivecouchbase.microservices.lib.Main'
+    repositories {
+        mavenCentral()
+        jcenter()
+        maven {
+            url 'https://raw.github.com/ReactiveCouchbase/repository/master/snapshots/'
+        }
+    }
+    dependencies {
+        testCompile 'junit:junit:4.12'
+    }
+}
+
+
+project(':library') {
+    dependencies {
+        compile 'org.slf4j:slf4j-api:1.7.13'
+        compile 'ch.qos.logback:logback-classic:1.1.3'
+        compile 'com.squareup.okhttp3:okhttp:3.1.2'
+        compile 'io.reactivex:rxjava:1.1.1'
+        compile 'io.ratpack:ratpack-core:1.2.0'
+        compile 'io.ratpack:ratpack-rx:1.2.0'
+        compile 'org.reactivecouchbase:common-lib:1.0-SNAPSHOT'
+        compile 'org.reactivecouchbase:client-lib:1.0-SNAPSHOT'
+        compile 'org.reactivecouchbase:json-lib:1.0-SNAPSHOT'
+        compile 'org.reactivecouchbase:validation-lib:1.0-SNAPSHOT'
+        compile 'org.reactivecouchbase:concurrent-lib:1.0-SNAPSHOT'
+        compile 'com.typesafe:config:1.3.0'
+        compile 'org.reflections:reflections:0.9.10'
+        compile 'com.hazelcast:hazelcast:3.6.1'
+    }
+}
+
+project(':service-proxy') {
+    dependencies {
+        compile project(':library')
+    }
+}
+
+project(':bikes-service') {
+    dependencies {
+        compile project(':library')
+    }
+}
+
+project(':containers-service') {
+    dependencies {
+        compile project(':library')
+    }
+}
+
+project(':aggregator') {
+    dependencies {
+        compile project(':library')
+    }
+}
+
+project(':dev-runner') {
+    // gradle -Pdev distZip
+    distZip {
+        onlyIf {
+            project.hasProperty("dev")
+        }
+    }
+    mainClassName = 'org.reactivecouchbase.microservices.Runner'
+    dependencies {
+        compile project(':service-proxy')
+        compile project(':bikes-service')
+        compile project(':containers-service')
+        compile project(':aggregator')
+    }
+}

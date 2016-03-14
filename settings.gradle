@@ -1,0 +1,8 @@
+include 'library'
+include 'service-proxy'
+include 'bikes-service'
+include 'containers-service'
+include 'aggregator'
+include 'dev-runner'
+
+rootProject.name = 'microservices'
