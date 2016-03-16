@@ -3,13 +3,19 @@ package org.reactivecouchbase.microservices.lib;
 import com.google.common.base.Throwables;
 import org.reactivecouchbase.client.ClientRegistry;
 import org.reactivecouchbase.concurrent.NamedExecutors;
+import org.reactivecouchbase.json.JsValue;
+import org.reactivecouchbase.json.Json;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ratpack.form.Form;
 import ratpack.handling.Chain;
+import ratpack.handling.Context;
 import ratpack.registry.RegistrySpec;
+import ratpack.rx.RxRatpack;
 import ratpack.server.BaseDir;
 import ratpack.server.RatpackServer;
 import ratpack.server.ServerConfig;
+import rx.Observable;
 
 import java.net.InetAddress;
 import java.net.ServerSocket;
@@ -17,6 +23,8 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
+
+import static ratpack.jackson.Jackson.jsonNode;
 
 public abstract class Server {
 
@@ -102,6 +110,14 @@ public abstract class Server {
         } catch (Exception e) {
             throw Throwables.propagate(e);
         }
+    }
+
+    public Observable<JsValue> jsonBody(Context ctx) {
+        return RxRatpack.observe(ctx.parse(jsonNode())).map(Json::fromJsonNode);
+    }
+
+    public Observable<Form> formBody(Context ctx) {
+        return RxRatpack.observe(ctx.parse(Form.class));
     }
 
     private static URI uri(String uri) {

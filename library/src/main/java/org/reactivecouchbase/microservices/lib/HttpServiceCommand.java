@@ -23,8 +23,9 @@ public class HttpServiceCommand extends Command<JsValue> {
     private final ClientRegistry clientRegistry;
     private final String serviceName;
     private final Function<ServiceDescriptor, Request> call;
+    private final String cacheKey;
 
-    HttpServiceCommand(JsValue fallback, int retry, Duration timeout, String serviceName, ClientRegistry clientRegistry, Function<ServiceDescriptor, Request> call) {
+    HttpServiceCommand(String cacheKey, JsValue fallback, int retry, Duration timeout, String serviceName, ClientRegistry clientRegistry, Function<ServiceDescriptor, Request> call) {
         Invariant.checkNotNull(fallback);
         Invariant.checkNotNull(timeout);
         Invariant.checkNotNull(serviceName);
@@ -36,6 +37,7 @@ public class HttpServiceCommand extends Command<JsValue> {
         this.clientRegistry = clientRegistry;
         this.serviceName = serviceName;
         this.call = call;
+        this.cacheKey = cacheKey;
     }
 
     @Override
@@ -76,6 +78,11 @@ public class HttpServiceCommand extends Command<JsValue> {
         return fallback;
     }
 
+    @Override
+    public String cacheKey() {
+        return cacheKey;
+    }
+
     public static Builder forService(String serviceName) {
         return new Builder(serviceName);
     }
@@ -87,9 +94,15 @@ public class HttpServiceCommand extends Command<JsValue> {
         private ClientRegistry clientRegistry;
         private String serviceName;
         private Function<ServiceDescriptor, Request> call;
+        private String cacheKey = null;
 
         Builder(String serviceName) {
             this.serviceName = serviceName;
+        }
+
+        public Builder withCacheKey(String cacheKey) {
+            this.cacheKey = cacheKey;
+            return this;
         }
 
         public HttpServiceCommand.Builder withFallback(JsValue fallback) {
@@ -123,7 +136,7 @@ public class HttpServiceCommand extends Command<JsValue> {
         }
 
         public HttpServiceCommand build() {
-            return new HttpServiceCommand(fallback, retry, timeout, serviceName, clientRegistry, call);
+            return new HttpServiceCommand(cacheKey, fallback, retry, timeout, serviceName, clientRegistry, call);
         }
     }
 }

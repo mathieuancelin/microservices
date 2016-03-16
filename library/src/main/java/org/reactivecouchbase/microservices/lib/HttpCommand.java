@@ -8,18 +8,23 @@ import org.reactivecouchbase.common.Invariant;
 import org.reactivecouchbase.concurrent.Future;
 import org.reactivecouchbase.json.JsValue;
 import org.reactivecouchbase.json.Json;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.ScheduledExecutorService;
 
 public class HttpCommand extends Command<JsValue> {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(HttpCommand.class);
 
     private final JsValue fallback;
     private final int retry;
     private final Duration timeout;
     private final Supplier<Request> call;
     private final String name;
+    private final String cacheKey;
 
-    HttpCommand(String name, JsValue fallback, int retry, Duration timeout, Supplier<Request> call) {
+    HttpCommand(String name, String cacheKey, JsValue fallback, int retry, Duration timeout, Supplier<Request> call) {
         Invariant.checkNotNull(fallback);
         Invariant.checkNotNull(timeout);
         Invariant.checkNotNull(call);
@@ -29,6 +34,7 @@ public class HttpCommand extends Command<JsValue> {
         this.retry = retry;
         this.timeout = timeout;
         this.call = call;
+        this.cacheKey = cacheKey;
     }
 
     @Override
@@ -38,7 +44,9 @@ public class HttpCommand extends Command<JsValue> {
 
     @Override
     public Future<JsValue> runAsync(ScheduledExecutorService ec) {
-        return WS.callAsync(call.get()).flatMap(response -> {
+        Request request = call.get();
+        LOGGER.info("Actual HTTP call to " + request.url().toString());
+        return WS.callAsync(request).flatMap(response -> {
             try {
                 return Future.successful(Json.parse(response.body().string()));
             } catch (Exception e) {
@@ -62,6 +70,11 @@ public class HttpCommand extends Command<JsValue> {
         return fallback;
     }
 
+    @Override
+    public String cacheKey() {
+        return cacheKey;
+    }
+
     public static Builder builder(String name) {
         return new Builder(name);
     }
@@ -72,9 +85,16 @@ public class HttpCommand extends Command<JsValue> {
         private int retry = 5;
         private Duration timeout = Duration.parse("10s");
         private Supplier<Request> call;
+        private String cacheKey = null;
 
         public Builder(String name) {
             this.name = name;
+            this.cacheKey = name;
+        }
+
+        public Builder withCacheKey(String cacheKey) {
+            this.cacheKey = cacheKey;
+            return this;
         }
 
         public Builder withFallback(JsValue fallback) {
@@ -98,8 +118,7 @@ public class HttpCommand extends Command<JsValue> {
         }
 
         public HttpCommand build() {
-            return new HttpCommand(name, fallback, retry, timeout, call);
+            return new HttpCommand(name, cacheKey, fallback, retry, timeout, call);
         }
     }
 }
-

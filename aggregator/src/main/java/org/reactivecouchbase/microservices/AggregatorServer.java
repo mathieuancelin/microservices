@@ -2,8 +2,8 @@ package org.reactivecouchbase.microservices;
 
 import okhttp3.Request;
 import org.reactivecouchbase.client.*;
-import org.reactivecouchbase.common.Duration;
 import org.reactivecouchbase.common.IdGenerators;
+import org.reactivecouchbase.concurrent.Future;
 import org.reactivecouchbase.functional.Option;
 import org.reactivecouchbase.json.JsValue;
 import org.reactivecouchbase.json.Json;
@@ -18,7 +18,6 @@ public class AggregatorServer extends Server {
 
     private CommandContext context = CommandContext
             .of(Runtime.getRuntime().availableProcessors() +  1)
-            .withCache(InMemoryCommandCache.of(Duration.parse("10s")))
             .withCircuitBreakerStrategy(CircuitBreaker.Strategy.UNIQUE_PER_COMMAND);
 
     public AggregatorServer() {
@@ -27,7 +26,9 @@ public class AggregatorServer extends Server {
 
     @Override
     public Chain routes(Chain chain) {
-        return chain.get("data", Async.observe(this::service));
+        return chain
+            .get("data", Async.observe(this::service))
+            .post("ping", Async.observe(this::ping));
     }
 
     @Override
@@ -56,10 +57,16 @@ public class AggregatorServer extends Server {
                 .withClientRegistry(clientRegistry)
                 .withCall(this::buildRequest)
                 .build();
-        return context.execute(bikeSheltersCommand).flatMap(firsJsValue ->
-            context.execute(glassContainersCommand).map(secondJsValue ->
+        Future<JsValue> commandExecution1 = context.execute(bikeSheltersCommand);
+        Future<JsValue> commandExecution2 = context.execute(glassContainersCommand);
+        return commandExecution1.flatMap(firsJsValue ->
+            commandExecution2.map(secondJsValue ->
                 Result.ok(Json.obj().with("glass-containers", secondJsValue).with("bike-shelters", secondJsValue))
             , executor)
         , executor).wrap(f -> Async.toObservable(f, executor));
+    }
+
+    public Observable<Result> ping(Context ctx) {
+        return jsonBody(ctx).map(value -> Result.ok(value.asObject().with("Via", "Ratpack ;-)")));
     }
 }
