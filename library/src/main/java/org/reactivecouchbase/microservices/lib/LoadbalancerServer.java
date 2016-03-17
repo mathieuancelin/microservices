@@ -16,7 +16,7 @@ public class LoadbalancerServer extends Server {
     private static final Logger LOGGER = LoggerFactory.getLogger(LoadbalancerServer.class);
 
     private List<String> hosts;
-    private AtomicInteger counter;
+    private AtomicInteger counter = new AtomicInteger(0);
 
     public LoadbalancerServer(int port, Set<String> hosts) {
         super(port);
