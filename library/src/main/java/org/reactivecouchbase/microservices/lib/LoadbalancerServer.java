@@ -44,16 +44,24 @@ public class LoadbalancerServer extends Server {
                 // TODO : avoid hardcoded protocol
                 URI newURI = new URI("http",  originalURI.getUserInfo(), host, port, originalURI.getPath(), originalURI.getQuery(), originalURI.getRawFragment());
                 LOGGER.trace("Balance : " + url("") + request.getRawUri() + " to " + newURI.toString());
-                client.requestStream(newURI, spec -> {
-                    spec.getHeaders().copy(request.getHeaders());
-                }).then(responseStream -> {
-                    responseStream.forwardTo(response, headers -> {
-                        String via = "Ratpack-Proxy";
-                        via = headers.get("Via") != null ? via + ", " + headers.get("Via") : via;
-                        headers.set("Via", via);
-                    });
-                });
+                forwardRequest(request, response, client, newURI);
             }
+        });
+    }
+
+    public static void forwardRequest(ratpack.http.Request request, ratpack.http.Response response, HttpClient client, URI newURI) {
+        request.getBody().then(body -> {
+            client.requestStream(newURI, spec -> {
+                spec.getHeaders().copy(request.getHeaders());
+                spec.method(request.getMethod().getName());
+                spec.getBody().bytes(body.getBytes());
+            }).then(responseStream -> {
+                responseStream.forwardTo(response, headers -> {
+                    String via = "Ratpack-Forwarder";
+                    via = headers.get("Via") != null ? via + ", " + headers.get("Via") : via;
+                    headers.set("Via", via);
+                });
+            });
         });
     }
 }

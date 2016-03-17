@@ -3,9 +3,11 @@ package org.reactivecouchbase.microservices;
 import org.reactivecouchbase.client.ClientRegistry;
 import org.reactivecouchbase.microservices.lib.Config;
 import org.reactivecouchbase.microservices.lib.HttpResource;
+import org.reactivecouchbase.microservices.lib.LoadbalancerServer;
 import org.reactivecouchbase.microservices.lib.Server;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ratpack.exec.Blocking;
 import ratpack.handling.Chain;
 import ratpack.http.client.HttpClient;
 
@@ -48,15 +50,7 @@ public class ServiceProxyServer extends Server {
                 // TODO : avoid hardcoded protocol
                 URI newURI = new URI("http",  originalURI.getUserInfo(), host, port, originalURI.getPath(), originalURI.getQuery(), originalURI.getRawFragment());
                 LOGGER.info("Proxy : " + url("") + request.getRawUri() + " to " + newURI.toString());
-                client.requestStream(newURI, spec -> {
-                    spec.getHeaders().copy(request.getHeaders());
-                }).then(responseStream -> {
-                    responseStream.forwardTo(response, headers -> {
-                        String via = "Ratpack-Proxy";
-                        via = headers.get("Via") != null ? via + ", " + headers.get("Via") : via;
-                        headers.set("Via", via);
-                    });
-                });
+                LoadbalancerServer.forwardRequest(request, response, client, newURI);
             }
         });
     }

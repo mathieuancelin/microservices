@@ -35,9 +35,11 @@ public class AggregatorServer extends Server {
     public void registerServices(ClientRegistry clientRegistry) {
         Registration registration1 = clientRegistry.register(new ServiceDescriptor(SERVICE_UID, "aggregator-service", url("/data"), Option.some("1.0.0")));
         Registration registration2 = clientRegistry.register(new HttpResource("/data", hostAndPort()));
+        Registration registration3 = clientRegistry.register(new HttpResource("/ping", hostAndPort()));
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             registration1.unregister();
             registration2.unregister();
+            registration3.unregister();
         }));
     }
 
