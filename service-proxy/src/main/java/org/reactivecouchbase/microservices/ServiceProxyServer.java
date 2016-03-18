@@ -1,7 +1,12 @@
 package org.reactivecouchbase.microservices;
 
+import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
 import org.reactivecouchbase.client.AsyncClientRegistry;
+import org.reactivecouchbase.client.ClientRegistry;
 import org.reactivecouchbase.client.ServiceDescriptor;
+import org.reactivecouchbase.json.JsObject;
+import org.reactivecouchbase.json.Json;
 import org.reactivecouchbase.microservices.lib.Config;
 import org.reactivecouchbase.microservices.lib.HttpResource;
 import org.reactivecouchbase.microservices.lib.LoadbalancerServer;
@@ -29,7 +34,53 @@ public class ServiceProxyServer extends Server {
 
     @Override
     public Chain routes(Chain chain) {
-        return chain.all(ctx -> {
+        return chain.get("__registry", ctx -> {
+            if (Config.config().mode().equals("dev")) {
+                ClientRegistry clientRegistry = ctx.get(ClientRegistry.class);
+                List<String> source = Lists.newArrayList(
+                        "<!DOCTYPE html>",
+                        "<html>",
+                        "<head>",
+                        "<title>Resources</title>",
+                        "<link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css\" integrity=\"sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7\" crossorigin=\"anonymous\">",
+                        "<link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css\" integrity=\"sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r\" crossorigin=\"anonymous\">",
+                        "<script src=\"http://code.jquery.com/jquery-1.12.2.min.js\"></script>",
+                        "<script src=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js\" integrity=\"sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS\" crossorigin=\"anonymous\"></script>",
+                        "</head>",
+                        "<body>",
+                        "<div class=\"container\">",
+                        "<h3>Services registry</h3>",
+                        "<table class=\"table table-striped table-condensed table-bordered table-hover\">",
+                        "<thead><tr><th>UUID</th><th>Name</th><th>URL</th><th>Version</th><th>Metadata</th></tr></thead>",
+                        "<tbody>"
+                );
+                clientRegistry.allServices().forEach(desc -> {
+                    source.add("<tr>"
+                            + "<td style=\"vertical-align: middle;\">" + desc.uid + "</td>"
+                            + "<td style=\"vertical-align: middle;\">" + desc.name + "</td>"
+                            + "<td style=\"vertical-align: middle;\">" + desc.url + "</td>"
+                            + "<td style=\"vertical-align: middle;\">" + desc.version.getOrElse("0.0.0") + "</td>"
+                            + "<td style=\"vertical-align: middle;\" class=\"metadata\">" + Json.wrap(desc.metadata).stringify() + "</td>"
+                            + "</tr>");
+                });
+                source.addAll(Lists.newArrayList(
+                        "</tbody>",
+                        "</table>",
+                        "</div>",
+                        "<script>",
+                        "  Array.from(document.querySelectorAll('.metadata')).forEach(function(node) {",
+                        "    node.innerHTML = '<pre style=\"margin-bottom: 0px;\"><code>' + JSON.stringify(JSON.parse(node.innerHTML), null, 2) + '</code></pre>';",
+                        "  });",
+                        "</script>",
+                        "</body>",
+                        "</html>"
+                ));
+                ctx.getResponse()
+                        .contentType("text/html")
+                        .status(200)
+                        .send(Joiner.on("\n").join(source));
+            }
+        }).all(ctx -> {
             AsyncClientRegistry clientRegistry = ctx.get(AsyncClientRegistry.class);
             HttpClient client = ctx.get(HttpClient.class);
             ratpack.http.Request request =  ctx.getRequest();

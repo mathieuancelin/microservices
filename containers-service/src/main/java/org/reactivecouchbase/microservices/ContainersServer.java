@@ -15,7 +15,7 @@ public class ContainersServer extends Server {
 
     private CommandContext context = CommandContext
         .of(Runtime.getRuntime().availableProcessors() +  1)
-        .withCache(InMemoryCommandCache.of(Duration.parse("60s")))
+        .withCache(InMemoryCommandCache.of(Duration.parse("5s")))
         .withCircuitBreakerStrategy(CircuitBreaker.Strategy.UNIQUE_PER_COMMAND);
 
     private static final String SERVICE_UID = IdGenerators.uuid();
