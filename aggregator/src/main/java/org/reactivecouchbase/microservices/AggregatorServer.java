@@ -48,7 +48,7 @@ public class AggregatorServer extends Server {
     }
 
     public Observable<Result> service(Context ctx) {
-        ClientRegistry clientRegistry = ctx.get(ClientRegistry.class);
+        AsyncClientRegistry clientRegistry = ctx.get(AsyncClientRegistry.class);
         Command<JsValue> bikeSheltersCommand = HttpServiceCommand
                 .forService("bike-shelters-fetcher")
                 .withClientRegistry(clientRegistry)

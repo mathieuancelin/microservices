@@ -1,13 +1,13 @@
 package org.reactivecouchbase.microservices.lib;
 
 import okhttp3.Request;
+import org.reactivecouchbase.client.AsyncClientRegistry;
 import org.reactivecouchbase.client.ClientRegistry;
 import org.reactivecouchbase.client.Command;
 import org.reactivecouchbase.client.ServiceDescriptor;
 import org.reactivecouchbase.common.Duration;
 import org.reactivecouchbase.common.Invariant;
 import org.reactivecouchbase.concurrent.Future;
-import org.reactivecouchbase.functional.Option;
 import org.reactivecouchbase.functional.Unit;
 import org.reactivecouchbase.json.JsValue;
 import org.reactivecouchbase.json.Json;
@@ -20,12 +20,12 @@ public class HttpServiceCommand extends Command<JsValue> {
     private final JsValue fallback;
     private final int retry;
     private final Duration timeout;
-    private final ClientRegistry clientRegistry;
+    private final AsyncClientRegistry clientRegistry;
     private final String serviceName;
     private final Function<ServiceDescriptor, Request> call;
     private final String cacheKey;
 
-    HttpServiceCommand(String cacheKey, JsValue fallback, int retry, Duration timeout, String serviceName, ClientRegistry clientRegistry, Function<ServiceDescriptor, Request> call) {
+    HttpServiceCommand(String cacheKey, JsValue fallback, int retry, Duration timeout, String serviceName, AsyncClientRegistry clientRegistry, Function<ServiceDescriptor, Request> call) {
         Invariant.checkNotNull(fallback);
         Invariant.checkNotNull(timeout);
         Invariant.checkNotNull(serviceName);
@@ -47,20 +47,21 @@ public class HttpServiceCommand extends Command<JsValue> {
 
     @Override
     public Future<JsValue> runAsync(ScheduledExecutorService ec) {
-        Option<ServiceDescriptor> service = clientRegistry.service(this.serviceName);
-        for (Unit none : service.asNone()) {
-            return Future.failed(new RuntimeException(serviceName + " service not found"));
-        }
-        for (ServiceDescriptor desc : service.asSome()) {
-            return WS.callAsync(call.apply(desc)).flatMap(response -> {
-                try {
-                    return Future.successful(Json.parse(response.body().string()));
-                } catch (Exception e) {
-                    return Future.failed(e);
-                }
-            }, ec);
-        }
-        return Future.failed(new RuntimeException("WUT ???"));
+        return clientRegistry.service(this.serviceName, ec).flatMap(service -> {
+            for (Unit none : service.asNone()) {
+                return Future.failed(new RuntimeException(serviceName + " service not found"));
+            }
+            for (ServiceDescriptor desc : service.asSome()) {
+                return WS.callAsync(call.apply(desc)).flatMap(response -> {
+                    try {
+                        return Future.successful(Json.parse(response.body().string()));
+                    } catch (Exception e) {
+                        return Future.failed(e);
+                    }
+                }, ec);
+            }
+            return Future.failed(new RuntimeException("WUT ???"));
+        });
     }
 
     @Override
@@ -91,7 +92,7 @@ public class HttpServiceCommand extends Command<JsValue> {
         private JsValue fallback = Json.arr();
         private int retry = 5;
         private Duration timeout = Duration.parse("10s");
-        private ClientRegistry clientRegistry;
+        private AsyncClientRegistry clientRegistry;
         private String serviceName;
         private Function<ServiceDescriptor, Request> call;
         private String cacheKey = null;
@@ -120,8 +121,13 @@ public class HttpServiceCommand extends Command<JsValue> {
             return this;
         }
 
-        public HttpServiceCommand.Builder withClientRegistry(ClientRegistry clientRegistry) {
+        public HttpServiceCommand.Builder withClientRegistry(AsyncClientRegistry clientRegistry) {
             this.clientRegistry = clientRegistry;
+            return this;
+        }
+
+        public HttpServiceCommand.Builder withClientRegistry(ClientRegistry clientRegistry) {
+            this.clientRegistry = new DistributedClientRegistry.AsyncDistributedClientRegistry(clientRegistry);
             return this;
         }
 

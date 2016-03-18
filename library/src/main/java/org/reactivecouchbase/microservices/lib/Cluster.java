@@ -6,8 +6,13 @@ import com.hazelcast.config.MaxSizeConfig;
 import com.hazelcast.core.Hazelcast;
 import com.hazelcast.core.HazelcastInstance;
 import org.reactivecouchbase.client.ClientRegistry;
+import org.reactivecouchbase.common.Duration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Cluster {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(Cluster.class);
 
     private HazelcastInstance hazelcast;
     private com.hazelcast.config.Config config;
@@ -23,7 +28,9 @@ public class Cluster {
                 .setEvictionPercentage(25)
                 .setMinEvictionCheckMillis(100L)
         );
+        Duration.Measurable measure = Duration.measure();
         hazelcast = Hazelcast.newHazelcastInstance(config);
+        LOGGER.info("starting cluster in " + measure.stop().toHumanReadable());
         distributedServiceRegistry = DistributedClientRegistry.build(this);
     }
 

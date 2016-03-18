@@ -1,6 +1,8 @@
 package org.reactivecouchbase.microservices.lib;
 
 import org.reactivecouchbase.concurrent.Future;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import ratpack.handling.Context;
 import ratpack.http.Response;
 import ratpack.rx.RxRatpack;
@@ -13,21 +15,23 @@ import java.util.stream.Collectors;
 
 public class Async {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(Async.class);
+
     static {
         RxRatpack.initialize();
     }
 
     public static <T> Observable<T> toObservable(Future<T> future, ExecutorService ec) {
         return Observable.create(subscriber -> {
-           future.andThen(tTry -> {
+            future.andThen(tTry -> {
                 for (Throwable failure : tTry.asFailure()) {
                     subscriber.onError(failure);
                 }
-               for (T next : tTry.asSuccess()) {
-                   subscriber.onNext(next);
-                   subscriber.onCompleted();
-               }
-           }, ec);
+                for (T next : tTry.asSuccess()) {
+                    subscriber.onNext(next);
+                    subscriber.onCompleted();
+                }
+            }, ec);
         });
     }
 

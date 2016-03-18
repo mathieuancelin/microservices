@@ -1,15 +1,22 @@
 package org.reactivecouchbase.microservices.lib;
 
 import com.google.common.collect.ImmutableList;
+import com.hazelcast.core.IMap;
+import org.reactivecouchbase.client.AsyncClientRegistry;
 import org.reactivecouchbase.client.ClientRegistry;
 import org.reactivecouchbase.client.Registration;
 import org.reactivecouchbase.client.ServiceDescriptor;
 import org.reactivecouchbase.common.Duration;
+import org.reactivecouchbase.concurrent.Future;
+import org.reactivecouchbase.concurrent.NamedExecutors;
+import org.reactivecouchbase.concurrent.Promise;
+import org.reactivecouchbase.functional.Unit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.concurrent.*;
+import java.util.function.Supplier;
 
 public class DistributedClientRegistry implements ClientRegistry {
 
@@ -27,7 +34,7 @@ public class DistributedClientRegistry implements ClientRegistry {
     }
 
     private void produceHeartbeat() {
-        ConcurrentMap<String, ServiceDescriptor> serviceCache = cluster.getCluster().getMap(REGISTRY_NAME);
+        IMap<String, ServiceDescriptor> serviceCache = cluster.getCluster().getMap(REGISTRY_NAME);
         LOGGER.info("Registering services again");
         locallyRegisteredServices.entrySet().forEach(entry -> {
             serviceCache.put(entry.getKey(), entry.getValue());
@@ -40,14 +47,16 @@ public class DistributedClientRegistry implements ClientRegistry {
 
     @Override
     public List<ServiceDescriptor> allServices() {
-        ConcurrentMap<String, ServiceDescriptor> serviceCache =
-                cluster.getCluster().getMap(REGISTRY_NAME);
-        return ImmutableList.copyOf(serviceCache.values());
+        return measure("get allServices", () -> {
+            IMap<String, ServiceDescriptor> serviceCache =
+                    cluster.getCluster().getMap(REGISTRY_NAME);
+            return ImmutableList.copyOf(serviceCache.values());
+        });
     }
 
     @Override
     public Registration register(ServiceDescriptor desc) {
-        ConcurrentMap<String, ServiceDescriptor> serviceCache =
+        IMap<String, ServiceDescriptor> serviceCache =
                 cluster.getCluster().getMap(REGISTRY_NAME);
         serviceCache.put(desc.uid, desc);
         locallyRegisteredServices.put(desc.uid, desc);
@@ -63,4 +72,63 @@ public class DistributedClientRegistry implements ClientRegistry {
         cluster.getCluster().getMap(REGISTRY_NAME).remove(uid);
     }
 
+    private static <T> T measure(String name, Supplier<T> supplier) {
+        Duration.Measurable measure = Duration.measure();
+        try {
+            return supplier.get();
+        } finally {
+            LOGGER.trace(name + " in " + measure.stop().toHumanReadable());
+        }
+    }
+
+    public static class AsyncDistributedClientRegistry implements AsyncClientRegistry {
+
+        private final ClientRegistry clientRegistry;
+
+        private static final ExecutorService ec = NamedExecutors.newAutoFixedThreadPool("ASYNC-CLIENT-REGISTRY-THREAD");
+
+        AsyncDistributedClientRegistry(ClientRegistry clientRegistry) {
+            this.clientRegistry = clientRegistry;
+        }
+
+        private <T> Future<T> async(Supplier<T> supplier) {
+            final Promise<T> promise = new Promise<>(ec);
+            ec.submit((Runnable) () -> {
+                try {
+                    promise.trySuccess(supplier.get());
+                } catch (Throwable e) {
+                    promise.tryFailure(e);
+                }
+            });
+            return promise.future();
+        }
+
+        private Future<Unit> asyncUnit(Runnable supplier) {
+            final Promise<Unit> promise = new Promise<>(ec);
+            ec.submit((Runnable) () -> {
+                try {
+                    supplier.run();
+                    promise.trySuccess(Unit.unit());
+                } catch (Throwable e) {
+                    promise.tryFailure(e);
+                }
+            });
+            return promise.future();
+        }
+
+        @Override
+        public Future<List<ServiceDescriptor>> allServices(ExecutorService ec) {
+            return async(clientRegistry::allServices);
+        }
+
+        @Override
+        public Future<Registration> register(ServiceDescriptor desc, ExecutorService ec) {
+            return async(() -> clientRegistry.register(desc));
+        }
+
+        @Override
+        public Future<Unit> unregister(String uuid, ExecutorService ec) {
+            return asyncUnit(() -> clientRegistry.unregister(uuid));
+        }
+    }
 }

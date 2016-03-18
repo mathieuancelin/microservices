@@ -1,6 +1,7 @@
 package org.reactivecouchbase.microservices.lib;
 
 import com.google.common.base.Throwables;
+import org.reactivecouchbase.client.AsyncClientRegistry;
 import org.reactivecouchbase.client.ClientRegistry;
 import org.reactivecouchbase.concurrent.NamedExecutors;
 import org.reactivecouchbase.json.JsValue;
@@ -103,6 +104,7 @@ public abstract class Server {
                         r.add(Config.class, new Config(configPath));
                         r.add(Cluster.class, cluster);
                         r.add(ClientRegistry.class, cluster.getDistributedServiceRegistry());
+                        r.add(AsyncClientRegistry.class, new DistributedClientRegistry.AsyncDistributedClientRegistry(cluster.getDistributedServiceRegistry()));
                         this.registry(r);
                     })
                     .handlers(this::routes)
