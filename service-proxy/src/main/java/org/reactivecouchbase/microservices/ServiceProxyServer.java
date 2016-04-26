@@ -32,6 +32,10 @@ public class ServiceProxyServer extends Server {
         super(Config.config().getInt("http.port", 9000));
     }
 
+    public ServiceProxyServer(int port) {
+        super(port);
+    }
+
     @Override
     public Chain routes(Chain chain) {
         return chain.get("__registry", ctx -> {
@@ -71,6 +75,7 @@ public class ServiceProxyServer extends Server {
                         "  Array.from(document.querySelectorAll('.metadata')).forEach(function(node) {",
                         "    node.innerHTML = '<pre style=\"margin-bottom: 0px;\"><code>' + JSON.stringify(JSON.parse(node.innerHTML), null, 2) + '</code></pre>';",
                         "  });",
+                        "  setInterval(function() { window.location.reload(); }, 5000)",
                         "</script>",
                         "</body>",
                         "</html>"

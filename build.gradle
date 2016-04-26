@@ -83,6 +83,7 @@ project(':dev-runner') {
         }
     }
     mainClassName = 'org.reactivecouchbase.microservices.Runner'
+    applicationDefaultJvmArgs = ["-Dport=${System.getProperty("port")}"]
     dependencies {
         compile project(':service-proxy')
         compile project(':bikes-service')
