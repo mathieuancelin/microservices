@@ -33,6 +33,12 @@ let compileServiceProxy = run({
 let server = runServer({
   httpPort,
   sh: `./gradlew dev-runner:run -q -Dport="${httpPort}"`
-}).dependsOn(compileLibrary, compileAggregator, compileBikeService, compileContainerService, compileServiceProxy)
+}).dependsOn(
+  compileLibrary,
+  compileAggregator,
+  compileBikeService,
+  compileContainerService,
+  compileServiceProxy
+)
 
 proxy(server, 8080)
